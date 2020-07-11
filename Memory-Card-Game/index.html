@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memory Card Game</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous" />
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+    <style>
+      .flip-container {
+        /* 设置从何处查看一个元素的角度 */
+        perspective: 1000;
+        min-height: 120px;
+        cursor: pointer;
+      }
+
+      .flip-container .memorycard {
+        position: relative;
+      }
+
+      .front, .back {
+        /* 隐藏旋转 div 元素的背面 */
+        backface-visibility: hidden;
+        /* 动画过渡持续时间 */
+        transition: 0.6s;
+        /* 让转换的子元素保留3D转换 */
+        transform-style: preserve-3d;
+        top: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+      }
+
+      .back {
+        transform: rotateY(-180deg);
+        position: absolute;
+      }
+
+      .back img {
+        height: 100%;
+        padding: 25px 0;
+      }
+
+      .flip-container.flipped .back {
+        transform: rotateY(0deg);
+      }
+
+      .flip-container.flipped .front {
+        transform: rotateY(180deg);
+      }
+
+      .matched {
+        opacity: 0.3;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="d-flex flex-row justify-content-center py-3">
+        <div class="turns p-3">
+          <span class="btn btn-info">Turns : <span class="badge" :class="finish ? 'badge-success' : 'badge-light'" >{{turns}}</span ></span>
+        </div>
+        <div class="totalTime p-3">
+          <span class="btn btn-info" >Total Time : <span class="badge" :class="finish ? 'badge-success' : 'badge-light'">{{min}} : {{sec}}</span></span>
+        </div>
+        <div class="totalTime p-3">
+          <button class="btn btn-info" @click="reset" :disabled="!start">Restart</button>
+        </div>
+      </div>
+      <div class="row" style="margin: 0;">
+        <div class="col-md-6 col-lg-6 col-xl-5 mx-auto">
+          <div class="row justify-content-md-center">
+            <div v-for="card in memoryCards" class="col-auto mb-3 flip-container" :class="{ 'flipped': card.isFlipped, 'matched' : card.isMatched }" @click="flipCard(card)">
+              <div class="memorycard">
+                <div class="front border rounded shadow">
+                  <img width="100" height="150" src="./images/card_bg.png" />
+                </div>
+                <div class="back border rounded shadow">
+                  <img width="100" height="150" :src="`./images/${card.img}`" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script>
+    const app = new Vue({
+      el: "#app",
+      data: {
+        memoryCards: [], // 记忆卡牌
+        flippedCards: [], // 转动卡牌
+        finish: false, // 是否完成
+        start: false, // 开始计时
+        turns: 0, // 反转次数
+        totalTime: {
+          minutes: 0,
+          seconds: 0,
+        },
+        cards: [
+          {
+            name: "Apple",
+            img: "apple.png",
+          },
+          {
+            name: "Avocado",
+            img: "avocado.png",
+          },
+          {
+            name: "Pear",
+            img: "pear.png",
+          },
+          {
+            name: "Mongo",
+            img: "mongo.png",
+          },
+          {
+            name: "Strawberry",
+            img: "strawberry.png",
+          },
+          {
+            name: "Purple",
+            img: "purple.png",
+          },
+        ],
+      },
+      created() {
+        // 给每一个卡牌对象都放入一个翻转flip和匹配match标识
+        this.cards.forEach((card) => {
+          Vue.set(card, "isFlipped", false);
+          Vue.set(card, "isMatched", false);
+        });
+        // 拼接两组卡片并洗牌
+        this.memoryCards = _.shuffle(
+          this.memoryCards.concat(
+            _.cloneDeep(this.cards),
+            _.cloneDeep(this.cards)
+          )
+        );
+      },
+      methods: {
+        // 翻转卡牌方法
+        flipCard(card) {
+					// 若卡片以匹配成功或以翻转或已有两个卡片了, 则不翻
+          if (card.isMatched || card.isFlipped || this.flippedCards.length === 2) {
+            return;
+          }
+
+					// 若未开始则开始游戏
+          if (!this.start) {
+            this._startGame();
+          }
+
+          card.isFlipped = true;
+
+					// 若翻转开片不足两个, 则可以继续翻
+          if (this.flippedCards.length < 2) {
+            this.flippedCards.push(card);
+          }
+
+					// 若翻转卡片已有两个, 则查看是否匹配
+          if (this.flippedCards.length === 2) {
+            this._match(card);
+          }
+        },
+        // 匹配卡牌方法
+        _match(card) {
+					// 当翻了两张卡, 则记一次数
+					this.turns++;
+					// 若翻转的卡片的属性一致, 则匹配成功
+          if (this.flippedCards[0].name === this.flippedCards[1].name) {
+						// 设置延时翻转匹配成功卡片
+            setTimeout(() => {
+              this.flippedCards.forEach((card) => (card.isMatched = true));
+              this.flippedCards = [];
+
+              // 若所有的牌都匹配完了, 则表示完成
+              if (this.memoryCards.every((card) => card.isMatched === true)) {
+                clearInterval(this.interval);
+                this.finish = true;
+              }
+            }, 400);
+          } else {
+						// 设置延时翻正匹配失败卡片
+            setTimeout(() => {
+              this.flippedCards.forEach((card) => {
+                card.isFlipped = false;
+              });
+              this.flippedCards = [];
+            }, 800);
+          }
+        },
+        // 开始游戏
+        _startGame() {
+          this._tick();
+          this.interval = setInterval(this._tick, 1000);
+          this.start = true;
+        },
+        // 计时
+        _tick() {
+          if (this.totalTime.seconds !== 59) {
+            this.totalTime.seconds++;
+            return;
+          }
+
+          this.totalTime.minutes++;
+          this.totalTime.seconds = 0;
+        },
+        // 重置卡片
+        reset() {
+          // 清除计时器
+          clearInterval(this.interval);
+
+          // Vue.set方法重新设置isFlipped反转和isMatched匹配为false
+          this.cards.forEach((card) => {
+            Vue.set(card, "isFlipped", false);
+            Vue.set(card, "isMatched", false);
+          });
+
+					// 设置延时重置卡片
+          setTimeout(() => {
+            this.memoryCards = [];
+            this.memoryCards = _.shuffle(
+              this.memoryCards.concat(
+                _.cloneDeep(this.cards),
+                _.cloneDeep(this.cards)
+              )
+						);
+						
+            this.totalTime.minutes = 0;
+            this.totalTime.seconds = 0;
+            this.start = false;
+            this.finish = false;
+            this.turns = 0;
+            this.flippedCards = [];
+          }, 600);
+        },
+      },
+      computed: {
+        sec() {
+          if (this.totalTime.seconds < 10) {
+            return "0" + this.totalTime.seconds;
+          }
+          return this.totalTime.seconds;
+				},
+        min() {
+          if (this.totalTime.minutes < 10) {
+            return "0" + this.totalTime.minutes;
+          }
+          return this.totalTime.minutes;
+        },
+      },
+    });
+  </script>
+</html>
